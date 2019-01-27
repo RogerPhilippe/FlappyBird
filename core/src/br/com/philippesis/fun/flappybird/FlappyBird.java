@@ -4,13 +4,15 @@ import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
-import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Circle;
 import com.badlogic.gdx.math.Intersector;
 import com.badlogic.gdx.math.Rectangle;
+import com.badlogic.gdx.utils.viewport.StretchViewport;
+import com.badlogic.gdx.utils.viewport.Viewport;
 
 import java.util.Random;
 
@@ -26,36 +28,36 @@ public class FlappyBird extends ApplicationAdapter {
     private Random numeroRandomico;
     private BitmapFont pontuacaoBitmap;
     private BitmapFont mensagemBitmap;
+    private BitmapFont creator;
     private Circle passaroCirculo;
     private Rectangle canoTopoRetangulo;
     private Rectangle canoBaixoRetangulo;
-    private ShapeRenderer shapeRenderer;
 
     // Atributos de configuração
-    private int movimento = 0;
-    private int larguraDispositivo;
-    private int alturaDispositivo;
+    private float larguraDispositivo;
+    private float alturaDispositivo;
 
     private float variacao = 0;
     private float queda = 0;
-    private float velocidadeQueda = 30;
     private float velocidadeMovimentoCano = 120;
     private float posicaoInicialVertical;
     private int estadoJogo = 0; //0 Não iniciou, 1 Iniciou, 2 Game Over
     private float posicaoMovHorizCano;
     private float espacoEntreCanosTopo;
     private float espacoEntreCanosBaixo;
-    private float deltaTime;
     private float alturaEntreCanosRandon;
     private int pontuacao = 0;
     private boolean pontuou = false;
-    private int posicaoPassaro;
-    private boolean fimJogo = false;
-	
-	@Override
+    private float posicaoPassaro;
+
+    // Câmera
+    private OrthographicCamera camera;
+    private Viewport viewport;
+
+
+    @Override
 	public void create () {
 		batch = new SpriteBatch();
-        shapeRenderer = new ShapeRenderer();
         // Textura passaro
 		bird = new Texture[5];
 		bird[0] = new Texture("passaro1.png");
@@ -81,9 +83,16 @@ public class FlappyBird extends ApplicationAdapter {
         mensagemBitmap.setColor(Color.WHITE);
         mensagemBitmap.getData().setScale(3);
 
+        // Creator
+        creator = new BitmapFont();
+        creator.setColor(Color.WHITE);
+        creator.getData().setScale(2);
+
 		// Configurações
-        larguraDispositivo = Gdx.graphics.getWidth();
-        alturaDispositivo = Gdx.graphics.getHeight();
+        float VIRTUAL_WIDTH = 768;
+        larguraDispositivo = VIRTUAL_WIDTH;//Gdx.graphics.getWidth();
+        float VIRTUAL_HEIGHT = 1024;
+        alturaDispositivo = VIRTUAL_HEIGHT;//Gdx.graphics.getHeight();
         posicaoInicialVertical = alturaDispositivo / 2;
         posicaoMovHorizCano = larguraDispositivo;
         espacoEntreCanosTopo = 150;
@@ -96,6 +105,15 @@ public class FlappyBird extends ApplicationAdapter {
         canoTopoRetangulo = new Rectangle();
         canoBaixoRetangulo = new Rectangle();
 
+        // Tela
+        camera = new OrthographicCamera();
+        camera.position.set(VIRTUAL_WIDTH / 2, VIRTUAL_HEIGHT / 2, 0);
+
+        // Preenche a tela, pode esticar ou deformar as imagens.
+        viewport = new StretchViewport(VIRTUAL_WIDTH, VIRTUAL_HEIGHT, camera);
+        // Ajusta tamanho da tela
+        //viewport = new FillViewport(VIRTUAL_WIDTH, VIRTUAL_HEIGHT, camera);
+
 	}
 
 	@Override
@@ -103,7 +121,7 @@ public class FlappyBird extends ApplicationAdapter {
 		Gdx.gl.glClearColor(0, 0, 0, 1);
 		Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-		deltaTime = Gdx.graphics.getDeltaTime();
+        float deltaTime = Gdx.graphics.getDeltaTime();
 
 		// Variação para bater das asas (troca das imagens)
 		variacao += deltaTime * 8;
@@ -124,6 +142,7 @@ public class FlappyBird extends ApplicationAdapter {
             }
             // Taxa queda
             if (posicaoInicialVertical >= 10) {
+                float velocidadeQueda = 30;
                 queda += deltaTime * velocidadeQueda;
                 posicaoInicialVertical -= queda;
             } else {
@@ -150,15 +169,15 @@ public class FlappyBird extends ApplicationAdapter {
                     // Almenta velocidade conforme pontuação
                     if(pontuacao <= 10) {
                         velocidadeMovimentoCano += 12;
-                    } else if(pontuacao >10 && pontuacao <=20) {
+                    } else if(pontuacao <= 20) {
                         velocidadeMovimentoCano += 10;
-                    } else if(pontuacao >20 && pontuacao <=30) {
+                    } else if(pontuacao <= 30) {
                         velocidadeMovimentoCano += 8;
-                    } else if(pontuacao >30 && pontuacao <=40) {
+                    } else if(pontuacao <= 40) {
                         velocidadeMovimentoCano += 6;
-                    } else if(pontuacao >40 && pontuacao <=50) {
+                    } else if(pontuacao <= 50) {
                         velocidadeMovimentoCano += 4;
-                    } else if(pontuacao >50 && pontuacao <=60) {
+                    } else if(pontuacao <= 60) {
                         velocidadeMovimentoCano += 2;
                     } else {
                         velocidadeMovimentoCano++;
@@ -176,6 +195,10 @@ public class FlappyBird extends ApplicationAdapter {
             }
         }
 
+        // Configurar dados de projeção da câmera
+        batch.setProjectionMatrix(camera.combined);
+
+        // Desenhar
 		batch.begin();
 
         // Background
@@ -197,6 +220,7 @@ public class FlappyBird extends ApplicationAdapter {
             // Mensagem para reiniciar
             mensagemBitmap.draw(batch, "Toque Para Reiniciar. :-)", (larguraDispositivo / 2) -
                     (gameOver.getWidth() / 2) - 34, (alturaDispositivo / 2) - gameOver.getHeight() / 3);
+            creator.draw(batch, "Cloned for study by Roger Philippe - 2019", 10, 30);
         }
 
 		batch.end();
@@ -243,6 +267,11 @@ public class FlappyBird extends ApplicationAdapter {
         canoBaixoY = ((alturaDispositivo / 2) - canoBaixo.getHeight()) - espacoEntreCanosBaixo + alturaEntreCanosRandon;
 
 	    return canoBaixoY;
+    }
+
+    @Override
+    public void resize(int width, int height) {
+	    viewport.update(width, height);
     }
 
 }
